@@ -117,9 +117,9 @@ export const settingsCss = `
 .dmg-speed-item small{display:block;font-size:11px;line-height:16px;color:var(--dsw-alias-label-tertiary)}
 
 /* ── composer usage line (conversation.composer.dock) ───────────────────── */
-.dmg-cu{display:flex;flex-wrap:wrap;align-items:center;gap:2px 12px;min-width:0;padding:0 4px;font-size:11px;line-height:16px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}
+.dmg-cu{display:flex;flex-wrap:wrap;align-items:center;gap:0 2px;min-width:0;padding:0;font-size:11px;line-height:16px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}
 .dmg-cu-ring{display:inline-flex}
-.dmg-cu-trigger{display:inline-flex;align-items:center;gap:4px;border:0;background:transparent;padding:0 2px;border-radius:6px;font:inherit;color:var(--dsw-alias-label-secondary);cursor:pointer;white-space:nowrap}
+.dmg-cu-trigger{display:inline-flex;align-items:center;gap:4px;box-sizing:border-box;min-width:0;height:28px;padding:6px 8px;border:none;border-radius:var(--dsw-radius-sm,8px);background:transparent;font:inherit;font-size:12px;line-height:16px;font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-tertiary);cursor:pointer;white-space:nowrap}
 .dmg-cu-trigger:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .dmg-cu-track{fill:none;stroke:var(--dsw-alias-border-l3,#8883);stroke-width:2}
 .dmg-cu-fill{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
@@ -130,6 +130,8 @@ export const settingsCss = `
 .dmg-cu-panel-head{display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
 .dmg-cu-panel-head span{color:var(--dsw-alias-label-tertiary)}
 .dmg-cu-account{padding-top:8px;border-top:.5px solid var(--dsw-alias-border-l3,#8883)}
+.dmg-cu-account.is-current{background:var(--dsw-alias-interactive-bg-hover);border-radius:8px;padding:8px 8px 2px;margin:0 -8px}
+.dmg-cu-current{margin-left:6px;padding:0 6px;border-radius:8px;font-size:10px;font-weight:400;background:var(--dsw-alias-label-secondary);color:var(--dsw-alias-bg-layer-2)}
 .dmg-cu-account-name{font-weight:500;margin-bottom:4px}
 .dmg-cu-line{display:grid;grid-template-columns:1fr auto auto;gap:2px 10px;margin-bottom:6px}
 .dmg-cu-label{color:var(--dsw-alias-label-secondary)}

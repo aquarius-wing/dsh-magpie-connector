@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { act, createElement as h } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { ComposerUsage, cardsForOwner, ownerOfSelection, summarize, tooltipText, formatCountdown } from '../src/client/ComposerUsage.js'
+import { ComposerUsage, cardsForOwner, ownerOfSelection, summarize, tooltipText, formatCountdown, matchServed } from '../src/client/ComposerUsage.js'
 import { sidebarRows } from '../src/client/sidebar-view.js'
 import { SIDEBAR_WINDOW_KINDS } from '../src/shared/sidebar-window.js'
 import { resetSidebarCardsCache } from '../src/client/sidebar-api.js'
@@ -39,7 +39,7 @@ describe('输入框下方用量行', () => {
     const fake = fakeApi({ 'GET cards': () => ok({ status: 'ok', cards: CARDS }) })
     await mount({ provider: 'dsh-magpie-connector-claude', model: 'claude/opus' }, fake)
     const text = line()!.textContent!
-    expect(text).toContain('5h limit 12%'); expect(text).toContain('7d limit 40%')
+    expect(text).toContain('5h 12%'); expect(text).toContain('7d 40%')
     expect(text).not.toContain('Codex')
   })
   it('选中非 Magpie 模型时不渲染，也不请求用量', async () => {
@@ -66,11 +66,11 @@ describe('输入框下方用量行', () => {
     const props = { api, loadSelection: async () => current, watchModel: (cb: () => void) => { notify = cb; return () => {} } }
     await act(async () => root.render(h(ComposerUsage, props)))
     await flush()
-    expect(line()!.textContent).toContain('5h limit')
+    expect(line()!.textContent).toContain('5h 12%')
     fail = true; resetSidebarCardsCache(); current = { provider: 'dsh-magpie-connector-codex', model: 'm' }
     await act(async () => { notify() })
     await flush()
-    expect(line()!.textContent).not.toContain('5h limit')
+    expect(line()!.textContent).not.toContain('5h 12%')
     expect(line()!.textContent).toContain('暂不可用')
   })
   it('多账号：用量取平均，重置取最早；单账号直接显示自己的重置', () => {
@@ -106,5 +106,24 @@ describe('输入框下方用量行', () => {
     expect(formatCountdown('bad', now)).toBeUndefined()
     const ring = { kind: 'fiveHour' as const, used: 40, resetsAt: '2030-01-01T02:05:00Z', accounts: 2 }
     expect(tooltipText(ring, now)).toBe('5h limit 2 个账号平均已用 40%，最早还有 2 小时 5 分 重置')
+  })
+  it('按网关回传的重置时间认出服务本会话的账号，只显示它并在面板高亮', async () => {
+    const reset = Date.parse('2030-01-02T08:00:00Z') / 1000
+    const two = [
+      { provider: 'claude', name: 'A', user: 'a', windows: [{ name: '5 hours', used: 20, resetsAt: '2030-01-02T10:00:00Z' }] },
+      { provider: 'claude', name: 'B', user: 'b', windows: [{ name: '5 hours', used: 60, resetsAt: '2030-01-02T08:00:00Z' }] },
+    ]
+    const rows = sidebarRows(two as never, SIDEBAR_WINDOW_KINDS)
+    expect(matchServed(rows, { fiveHour: { reset } })!.map(r => r.card.user)).toEqual(['b'])
+    expect(matchServed(rows, { fiveHour: { reset: reset + 3600 } })).toBeUndefined()
+    expect(matchServed(rows, undefined)).toBeUndefined()
+    const fake = fakeApi({ 'GET cards': () => ok({ status: 'ok', cards: two }) })
+    await act(async () => root.render(h(ComposerUsage, { api: fake.api, loadSelection: async () => ({ provider: 'dsh-magpie-connector-claude', model: 'm' }), loadServed: async () => ({ fiveHour: { reset } }) })))
+    await flush()
+    expect(line()!.textContent).toContain('5h 60%')
+    await act(async () => { (host.querySelector('.dmg-cu-trigger') as HTMLButtonElement).click() })
+    const current = document.querySelectorAll('[data-current]')
+    expect(current).toHaveLength(1)
+    expect(current[0]!.textContent).toContain('B')
   })
 })

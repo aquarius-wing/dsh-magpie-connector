@@ -1,6 +1,6 @@
 import { MagpieSettings } from './SettingsPage.js'
 import { ensureStyles } from './styles.js'
-import { ComposerUsage, createCurrentSelection } from './ComposerUsage.js'
+import { ComposerUsage, createCurrentSelection, createServedLoader } from './ComposerUsage.js'
 import { SidebarUsage } from './SidebarUsage.js'
 import { SpeedSelect, createModelWatcher, createSpeedLoader, createSpeedSetter, type ModelDirectories } from './SpeedSelect.js'
 import { createFetchApi, type Api } from './api.js'
@@ -70,7 +70,7 @@ export function apply(ctx: ClientContext, api: Api = createFetchApi()): void {
     name: 'conversation.composer.dock', id: 'dsh-magpie-connector-usage', order: 1,
     inject: (sessionId?: unknown) => {
       const id = typeof sessionId === 'string' ? sessionId : ''
-      return { api, loadSelection: createCurrentSelection(models, id), watchModel: createModelWatcher(models, id) }
+      return { api, loadSelection: createCurrentSelection(models, id), loadServed: createServedLoader(api, id), watchModel: createModelWatcher(models, id) }
     },
   }, ComposerUsage))
 }

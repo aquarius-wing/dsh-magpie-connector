@@ -26,7 +26,7 @@ export function apply(ctx: Context, config: Config = {}) {
   let registrar!: RouteRegistrar
   const runtime = new MagpieRuntime(ctx.credentials, new SettingsStore(resolve(home, 'plugins/dsh-magpie-connector/settings.json')), routes => registrar.publish(routes ?? runtime.routeSet()))
   const speed = new SpeedController()
-  adapter = new MagpieAdapter(runtime, ctx.get('attachments'), session => speed.get(session).tier === 'fast')
+  adapter = new MagpieAdapter(runtime, ctx.get('attachments'), session => speed.get(session).tier === 'fast', (session, headers) => speed.recordServed(session, headers))
   registrar = createRouteRegistrar(ctx.llm, adapter)
   ctx.on('credentials/reference-updated', ref => runtime.invalidateCredential(ref))
   ctx.inject(['connection'], child => {

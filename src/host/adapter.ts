@@ -99,7 +99,7 @@ export function mapUsage(u: Usage): TokenUsage {
   return {inputTokens:u.input,outputTokens:u.output,...(u.cacheRead>0?{cacheReadTokens:u.cacheRead}:{}),...(u.cacheWrite>0?{cacheWriteTokens:u.cacheWrite}:{}),...(u.input>0?{totalTokens:u.input+u.cacheRead+u.cacheWrite+u.output}:{})}
 }
 export class MagpieAdapter extends LlmAdapter {
-  constructor(readonly runtime: MagpieRuntime, readonly attachments?: Pick<AttachmentStore, 'readImage' | 'imageHostPath'>, readonly isFast = (_session: string) => false) { super() }
+  constructor(readonly runtime: MagpieRuntime, readonly attachments?: Pick<AttachmentStore, 'readImage' | 'imageHostPath'>, readonly isFast = (_session: string) => false, readonly onServed: (session: string, headers: Headers) => void = () => {}) { super() }
   override providerInfo(route: string) { return {id:route,name:ownerLabel(ownerOfRoute(route))} }
   override providerRetryPolicy() { return RETRY_POLICY }
   /** Look the model up by id in the whole catalog (route-independent); the returned provider is the requested route. */
@@ -184,6 +184,7 @@ export class MagpieAdapter extends LlmAdapter {
       const watchedFetch:typeof fetch=async(input,init)=>{
         const response=await gatewayFetch(input,init)
         arm()
+        if(response.ok&&options.sessionId){try{this.onServed(options.sessionId,response.headers)}catch{}}
         if(!response.ok){http={status:response.status,...(retryAfterMs(response)!==undefined?{retryAfterMs:retryAfterMs(response)!}:{})};return response}
         if(!response.body)return response
         const body=response.body.pipeThrough(new TransformStream<Uint8Array,Uint8Array>({transform(chunk,out){arm();out.enqueue(chunk)}}))

@@ -39,7 +39,28 @@ export function summarize(rows: SidebarRow[]): RingSummary[] {
   return out
 }
 
-export type ComposerView = { kind: 'hidden' } | { kind: 'status'; text: string } | { kind: 'rows'; rows: SidebarRow[]; matched: boolean }
+/** What the host remembers of the account that served the session's last reply (reset = epoch seconds). */
+export interface ServedFacts { fiveHour?: { reset: number }; weekly?: { reset: number } }
+/** Gateway reset headers and card reset times are the same instants; allow a little rounding. */
+const RESET_TOLERANCE_MS = 120_000
+
+/**
+ * The accounts whose windows reset exactly when the serving account's did.
+ * Undefined when nothing matches, so callers fall back to every account of the upstream.
+ */
+export function matchServed(rows: SidebarRow[], served: ServedFacts | undefined): SidebarRow[] | undefined {
+  if (!served) return undefined
+  const score = (row: SidebarRow) => row.failed ? 0 : (['fiveHour', 'weekly'] as const).reduce((sum, kind) => {
+    const want = served[kind]?.reset
+    if (want === undefined) return sum
+    return sum + (row.windows.some(win => win.kind === kind && Math.abs(Date.parse(win.window.resetsAt ?? '') - want * 1000) <= RESET_TOLERANCE_MS) ? 1 : 0)
+  }, 0)
+  const scored = rows.map(row => ({ row, n: score(row) }))
+  const best = Math.max(0, ...scored.map(x => x.n))
+  return best === 0 ? undefined : scored.filter(x => x.n === best).map(x => x.row)
+}
+
+export type ComposerView = { kind: 'hidden' } | { kind: 'status'; text: string } | { kind: 'rows'; rows: SidebarRow[]; matched: boolean; /** Accounts known to have served this session, highlighted in the panel. */ served?: string[] }
 
 /** Owner key of the current model's route, or undefined when it is not one of ours. */
 export const ownerOfSelection = (selection: ComposerSelection | null): string | undefined =>
@@ -52,6 +73,15 @@ export function cardsForOwner(cards: Card[], owner: string): { cards: Card[]; ma
   return hit.length > 0 ? { cards: hit, matched: true } : { cards, matched: false }
 }
 
+/** Account facts the host kept for this session; undefined until a reply has been served. */
+export function createServedLoader(api: Api, sessionId: string): () => Promise<ServedFacts | undefined> {
+  return async () => {
+    const response = await api({ method: 'GET', path: 'speed', query: { session: sessionId } })
+    const served = (response.body as { served?: ServedFacts } | null)?.served
+    return response.status >= 200 && response.status < 300 && served && typeof served === 'object' ? served : undefined
+  }
+}
+
 export function createCurrentSelection(models: () => ModelDirectories | undefined, sessionId: string): () => Promise<ComposerSelection | null> {
   return async () => {
     const directories = models()
@@ -60,7 +90,7 @@ export function createCurrentSelection(models: () => ModelDirectories | undefine
   }
 }
 
-export function ComposerUsage({ api, loadSelection, watchModel }: { api?: Api; loadSelection?: () => Promise<ComposerSelection | null>; watchModel?: (onChange: () => void) => () => void }) {
+export function ComposerUsage({ api, loadSelection, watchModel, loadServed }: { api?: Api; loadSelection?: () => Promise<ComposerSelection | null>; watchModel?: (onChange: () => void) => () => void; loadServed?: () => Promise<ServedFacts | undefined> }) {
   const [view, setView] = useState<ComposerView>({ kind: 'hidden' })
   const [now, setNow] = useState(() => Date.now())
   const active = useRef(true)
@@ -87,7 +117,12 @@ export function ComposerUsage({ api, loadSelection, watchModel }: { api?: Api; l
         if (result.status !== 'ok') { setView({ kind: 'status', text: t('composerUsageUnavailable') }); return }
         const picked = cardsForOwner(result.cards, owner)
         setNow(Date.now())
-        setView(picked.cards.length === 0 ? { kind: 'hidden' } : { kind: 'rows', rows: sidebarRows(picked.cards, SIDEBAR_WINDOW_KINDS), matched: picked.matched })
+        if (picked.cards.length === 0) { setView({ kind: 'hidden' }); return }
+        const rows = sidebarRows(picked.cards, SIDEBAR_WINDOW_KINDS)
+        let served: SidebarRow[] | undefined
+        try { served = matchServed(rows, await loadServed?.()) } catch { /* no account facts: show every account */ }
+        if (!active.current || mine !== version.current) return
+        setView({ kind: 'rows', rows, matched: picked.matched, ...(served ? { served: served.map(row => cardIdentity(row.card)) } : {}) })
       } catch {
         // Keep readings already shown for this upstream; otherwise say so instead of staying blank.
         if (active.current && mine === version.current) setView(previous => previous.kind === 'rows' ? previous : { kind: 'status', text: t('composerUsageUnavailable') })
@@ -100,9 +135,10 @@ export function ComposerUsage({ api, loadSelection, watchModel }: { api?: Api; l
   }, [])
   if (view.kind === 'hidden') return null
   if (view.kind === 'status') return h('div', { className: 'dmg-cu', 'data-magpie-composer-usage': '', role: 'status' }, h('span', { className: 'dmg-cu-status' }, view.text))
-  const rings = summarize(view.rows)
+  const shown = view.served ? view.rows.filter(row => view.served!.includes(cardIdentity(row.card))) : view.rows
+  const rings = summarize(shown)
   if (rings.length === 0) return null
-  return h('div', { className: 'dmg-cu', 'data-magpie-composer-usage': '' }, ...rings.map(ring => h(Ring, { key: ring.kind, ring, rows: view.rows, now })))
+  return h('div', { className: 'dmg-cu', 'data-magpie-composer-usage': '' }, ...rings.map(ring => h(Ring, { key: ring.kind, ring, rows: view.rows, ...(view.served ? { served: view.served } : {}), now })))
 }
 
 const RADIUS = 5.5
@@ -140,7 +176,7 @@ function placeAbove(anchor: HTMLElement | null, width: number): { left: number; 
   return { left, bottom: window.innerHeight - box.top + 8 }
 }
 
-function Ring({ ring, rows, now }: { ring: RingSummary; rows: SidebarRow[]; now: number }): ReactNode {
+function Ring({ ring, rows, served, now }: { ring: RingSummary; rows: SidebarRow[]; served?: string[]; now: number }): ReactNode {
   const [open, setOpen] = useState(false)
   const [hover, setHover] = useState(false)
   const rootRef = useRef<HTMLSpanElement | null>(null)
@@ -164,14 +200,14 @@ function Ring({ ring, rows, now }: { ring: RingSummary; rows: SidebarRow[]; now:
       h('svg', { viewBox: '0 0 14 14', width: 14, height: 14, 'aria-hidden': true },
         h('circle', { className: 'dmg-cu-track', cx: 7, cy: 7, r: RADIUS }),
         h('circle', { className: 'dmg-cu-fill', cx: 7, cy: 7, r: RADIUS, strokeDasharray: `${CIRCUMFERENCE * used / 100} ${CIRCUMFERENCE}`, transform: 'rotate(-90 7 7)' })),
-      h('span', null, `${limitName(ring.kind)} ${formatUsed(used)}`)),
+      h('span', null, `${ring.kind === 'fiveHour' ? '5h' : '7d'} ${formatUsed(used)}`)),
     hover && !open ? createPortal(h('div', { className: 'dmg-cu-tip', role: 'tooltip', style: placeAbove(rootRef.current, 260) }, tip), document.body) : null,
     open ? createPortal(h('div', { ref: panelRef, className: 'dmg-cu-panel', role: 'dialog', 'aria-label': limitName(ring.kind), style: placeAbove(rootRef.current, 300) },
       h('div', { className: 'dmg-cu-panel-head' }, h('strong', null, t('composerPanelTitle')), h('span', null, tip)),
-      ...rows.map(row => panelAccount(row, now))), document.body) : null)
+      ...rows.map(row => panelAccount(row, now, served?.includes(cardIdentity(row.card)) === true))), document.body) : null)
 }
 
-function panelAccount(row: SidebarRow, now: number): ReactNode {
+function panelAccount(row: SidebarRow, now: number, current = false): ReactNode {
   const title = [row.card.name ?? row.card.provider, row.card.user].filter(Boolean).join(' · ')
   const body = row.failed
     ? [h('div', { key: 'err', className: 'dmg-cu-line' }, t('usageReadingFailed'))]
@@ -185,5 +221,5 @@ function panelAccount(row: SidebarRow, now: number): ReactNode {
           h('span', { className: 'dmg-cu-reset' }, reset === undefined ? '—' : `↻ ${reset}`),
           win.used === undefined ? null : h('div', { className: 'dmg-cu-bar', 'aria-hidden': true }, h('i', { 'data-level': usedLevel(win.used), style: { width: `${win.used}%` } })))
       })
-  return h('section', { key: cardIdentity(row.card), className: 'dmg-cu-account' }, h('div', { className: 'dmg-cu-account-name' }, title), ...body)
+  return h('section', { key: cardIdentity(row.card), className: current ? 'dmg-cu-account is-current' : 'dmg-cu-account', ...(current ? { 'data-current': '' } : {}) }, h('div', { className: 'dmg-cu-account-name' }, title, current ? h('span', { className: 'dmg-cu-current' }, t('composerCurrentAccount')) : null), ...body)
 }

@@ -217,6 +217,7 @@ export const en = {
   composerCountdownMS: '{m} min {s} sec',
   composerTipNoReset: '{name}: {used} used',
   composerPanelTitle: 'Magpie usage',
+  composerCurrentAccount: 'This session',
   speedSaveFailed: 'Speed was not saved, please retry',
   speedMenu: 'Speed',
 } satisfies Record<string, string>
@@ -423,6 +424,7 @@ export const zh: Record<MagpieKey, string> = {
   composerCountdownMS: '{m} 分 {s} 秒',
   composerTipNoReset: '{name} 已用 {used}',
   composerPanelTitle: 'Magpie 额度',
+  composerCurrentAccount: '当前会话',
   speedSaveFailed: '速度未保存，请重试',
   speedMenu: '速度',
 }
