@@ -117,12 +117,13 @@ export const settingsCss = `
 .dmg-speed-item small{display:block;font-size:11px;line-height:16px;color:var(--dsw-alias-label-tertiary)}
 
 /* ── composer usage line (conversation.composer.dock) ───────────────────── */
-.dmg-cu{display:flex;flex-wrap:wrap;align-items:center;gap:0 2px;min-width:0;padding:0;font-size:11px;line-height:16px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}
+.dmg-cu{display:flex;flex-wrap:wrap;align-items:center;gap:0 2px;min-width:0;padding:0;font-size:inherit;color:var(--dsw-alias-label-tertiary)}
 .dmg-cu-ring{display:inline-flex}
-.dmg-cu-trigger{display:inline-flex;align-items:center;gap:4px;box-sizing:border-box;min-width:0;height:28px;padding:6px 8px;border:none;border-radius:var(--dsw-radius-sm,8px);background:transparent;font:inherit;font-size:12px;line-height:16px;font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-tertiary);cursor:pointer;white-space:nowrap}
-.dmg-cu-trigger:hover{background:var(--dsw-alias-interactive-bg-hover)}
-.dmg-cu-track{fill:none;stroke:var(--dsw-alias-border-l3,#8883);stroke-width:2}
-.dmg-cu-fill{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.dmg-cu-trigger{display:inline-flex;align-items:center;flex:none;gap:6px;box-sizing:border-box;padding:1px 8px;border:none;border-radius:var(--dsw-radius-sm,8px);background:transparent;font-family:inherit;font-size:var(--dsh-content-font-size-secondary,13px);line-height:calc(20px + var(--dsh-content-font-delta-secondary,0px));font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-tertiary);cursor:pointer;white-space:nowrap}
+.dmg-cu-trigger[aria-expanded=true]{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary)}
+@media (hover:hover){.dmg-cu-trigger:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary)}}
+.dmg-cu-track{fill:none;stroke:var(--dsw-alias-border-l3,#8883);stroke-width:2px}
+.dmg-cu-fill{fill:none;stroke:var(--dsw-alias-label-tertiary);stroke-width:2px;stroke-linecap:round}
 .dmg-cu-trigger[data-level=warn] .dmg-cu-fill{stroke:var(--dsw-alias-label-warning,#b7791f)}
 .dmg-cu-trigger[data-level=high] .dmg-cu-fill{stroke:var(--dsw-alias-label-danger,#c53030)}
 .dmg-cu-tip{position:fixed;z-index:1000;max-width:260px;padding:6px 9px;border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-size:12px;line-height:17px;box-shadow:0 4px 16px #0003;pointer-events:none}
