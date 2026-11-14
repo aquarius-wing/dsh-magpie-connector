@@ -1,5 +1,6 @@
 import { MagpieSettings } from './SettingsPage.js'
 import { ensureStyles } from './styles.js'
+import { ComposerUsage, createCurrentSelection } from './ComposerUsage.js'
 import { SidebarUsage } from './SidebarUsage.js'
 import { SpeedSelect, createModelWatcher, createSpeedLoader, createSpeedSetter, type ModelDirectories } from './SpeedSelect.js'
 import { createFetchApi, type Api } from './api.js'
@@ -64,4 +65,12 @@ export function apply(ctx: ClientContext, api: Api = createFetchApi()): void {
       return { loadSpeed: createSpeedLoader(api, models, id), setSpeed: createSpeedSetter(api, id), watchModel: createModelWatcher(models, id) }
     },
   }, SpeedSelect))
+  // Usage line in the composer dock (beside the context meter): only for this plugin's models.
+  ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
+    name: 'conversation.composer.dock', id: 'dsh-magpie-connector-usage', order: 1,
+    inject: (sessionId?: unknown) => {
+      const id = typeof sessionId === 'string' ? sessionId : ''
+      return { api, loadSelection: createCurrentSelection(models, id), watchModel: createModelWatcher(models, id) }
+    },
+  }, ComposerUsage))
 }

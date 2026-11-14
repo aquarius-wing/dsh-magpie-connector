@@ -51,6 +51,7 @@ const SLOTS = [
   'settings.section.icon#dsh-magpie-connector',
   'sidebar.footer.action#magpie-usage',
   'conversation.input.right#dsh-magpie-connector-speed',
+  'conversation.composer.dock#dsh-magpie-connector-usage',
 ]
 
 it('重建后的客户端 bundle 可以重新 apply（语言字典随条目释放）', () => {

@@ -1,6 +1,6 @@
 import { createElement as h, Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { useAnchoredPosition, useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
+import { useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
 import { errorText, type Api } from './api.js'
 import { ensureStyles } from './styles.js'
 import { t } from './locales.js'
@@ -34,6 +34,31 @@ export interface SidebarUsageProps {
 }
 
 const RAIL_POPOVER_WIDTH = 320
+
+/**
+ * Local replacement for the host primitive `useAnchoredPosition`, which newer DSH
+ * builds no longer export (importing it crashed the whole slot). Places a fixed
+ * panel above its anchor, left-aligned, clamped into the viewport.
+ */
+function useAnchoredPosition({ open, anchorRef, panelRef, gap, margin }: { open: boolean; anchorRef: { current: HTMLElement | null }; panelRef: { current: HTMLElement | null }; gap: number; margin: number }): { left: number; top: number } | null {
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
+  useLayoutEffect(() => {
+    if (!open) { setPos(null); return }
+    const place = () => {
+      const anchor = anchorRef.current?.getBoundingClientRect()
+      if (!anchor) return
+      const panel = panelRef.current?.getBoundingClientRect()
+      const width = panel?.width ?? 0, height = panel?.height ?? 0
+      const left = Math.max(margin, Math.min(anchor.left, window.innerWidth - width - margin))
+      const top = Math.max(margin, anchor.top - gap - height)
+      setPos(previous => previous && previous.left === left && previous.top === top ? previous : { left, top })
+    }
+    place()
+    window.addEventListener('resize', place)
+    return () => window.removeEventListener('resize', place)
+  }, [open])
+  return pos
+}
 
 export function SidebarUsage({ api, wide = true }: SidebarUsageProps) {
   const [preference, setPreference] = useState<SidebarPreference | undefined>(() => readSidebarPreference())
@@ -131,7 +156,7 @@ export function SidebarUsage({ api, wide = true }: SidebarUsageProps) {
   }, [enabled, api, refreshMinutes])
 
   const railOpen = open && !wide
-  const pos = useAnchoredPosition({ open: railOpen, anchorRef, panelRef, side: 'top', align: 'start', gap: 8, margin: 12 })
+  const pos = useAnchoredPosition({ open: railOpen, anchorRef, panelRef, gap: 8, margin: 12 })
   useDismissOnOutsidePointer(anchorRef, railOpen, setOpen, panelRef)
   useEffect(() => {
     if (!open) return
